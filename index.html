@@ -4,10 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JLPT N1 語彙クイズ（1800問）</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-  <script type="module" src="./main.js"></script>
+  <script defer src="main.js"></script>
+  <script defer src="App.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 text-gray-900">
-  <div id="root" class="p-4"></div>
+  <div id="app" class="max-w-xl mx-auto mt-10 p-4 bg-white shadow rounded-lg">
+    <h1 class="text-2xl font-bold mb-4">JLPT N1 語彙クイズ（1800問）</h1>
+    <div id="quiz"></div>
+  </div>
 </body>
 </html>
