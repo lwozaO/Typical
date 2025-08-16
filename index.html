@@ -2,17 +2,68 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JLPT N1 語彙クイズ（リアル1800問）</title>
-  <script defer src="main.js"></script>
-  <script defer src="App.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JLPT N1 語彙クイズ（最大3000問・5秒制限）</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    .btn{ @apply px-3 py-2 rounded font-medium; }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
-  <div id="app" class="max-w-xl mx-auto mt-10 p-4 bg-white shadow rounded-lg">
-    <h1 class="text-2xl font-bold mb-4">JLPT N1 語彙クイズ（リアル1800問・10秒）</h1>
-    <div id="quiz"></div>
-    <div id="timer" class="text-red-600 font-bold mt-4 text-lg"></div>
+  <div class="max-w-3xl mx-auto p-4">
+    <h1 class="text-2xl font-bold mb-2">JLPT N1 語彙クイズ（最大3000問・5秒制限）</h1>
+    <p class="text-sm text-gray-600 mb-4">
+      オープンデータからN1語彙をロードして、4択クイズを自動生成します。読み込みに数秒かかる場合があります。
+    </p>
+
+    <div class="bg-white rounded-lg shadow p-4 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">カテゴリー（品詞）</label>
+          <select id="categorySelect" class="w-full p-2 border rounded">
+            <option value="all">すべて</option>
+            <option value="名詞">名詞</option>
+            <option value="動詞">動詞</option>
+            <option value="形容詞">形容詞</option>
+            <option value="副詞">副詞</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">出題数（最大3000）</label>
+          <input id="limitInput" class="w-full p-2 border rounded" type="number" value="3000" min="10" max="3000">
+        </div>
+        <div class="flex items-end">
+          <button id="startBtn" class="btn bg-blue-600 text-white w-full">読み込み＆開始</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="status" class="text-sm text-gray-600 mb-2">準備中...</div>
+
+    <div id="quizCard" class="bg-white rounded-lg shadow p-4 hidden">
+      <div class="flex items-center justify-between mb-2">
+        <div id="progress" class="text-sm text-gray-500">0 / 0</div>
+        <div id="timer" class="text-red-600 font-bold text-lg">5</div>
+      </div>
+      <div id="question" class="text-lg font-semibold mb-3">問題テキスト</div>
+      <div id="choices" class="grid gap-2"></div>
+      <div id="score" class="mt-3 text-blue-600 font-bold">スコア: 0</div>
+    </div>
+
+    <div class="mt-6 text-xs text-gray-500">
+      <h2 class="font-semibold mb-1">データ出典（敬称略・自動統合）</h2>
+      <ul class="list-disc ml-5 space-y-1">
+        <li>JLPT Vocabulary API（CORS対応）：<code>https://jlpt-vocab-api.vercel.app</code></li>
+        <li>open-anki-jlpt-decks（MIT）CSV：<code>https://github.com/jamsinclair/open-anki-jlpt-decks</code></li>
+        <li>jlpt-word-list（MIT）JSON：<code>https://github.com/elzup/jlpt-word-list</code></li>
+        <li>JLPT_Vocabulary（Tanos由来, CC BY）：<code>https://github.com/Bluskyo/JLPT_Vocabulary</code></li>
+        <li>辞書情報：JMdict / EDICT（EDRDG, CC BY-SA）</li>
+      </ul>
+      <p class="mt-2">※ 出典の仕様変更・一時停止等で一部ソースが取得できない場合があります（その場合は取得できたソースのみで出題）。</p>
+    </div>
   </div>
+
+  <script src="./main.js"></script>
 </body>
 </html>
