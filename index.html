@@ -6,14 +6,19 @@
   <title>JLPT N1 語彙クイズ（最大3000問・5秒制限）</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    .btn{ @apply px-3 py-2 rounded font-medium; }
+    .btn{padding:.5rem .75rem;border-radius:.5rem;font-weight:600}
+    .btn-primary{background:#2563eb;color:#fff}
+    .btn-secondary{background:#e5e7eb}
+    .muted{color:#6b7280}
+    .chip{display:inline-block;padding:.15rem .5rem;background:#eef2ff;border-radius:9999px;font-size:.75rem;margin-left:.5rem}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
   <div class="max-w-3xl mx-auto p-4">
     <h1 class="text-2xl font-bold mb-2">JLPT N1 語彙クイズ（最大3000問・5秒制限）</h1>
     <p class="text-sm text-gray-600 mb-4">
-      オープンデータからN1語彙をロードして、4択クイズを自動生成します。読み込みに数秒かかる場合があります。
+      公開データからN1語彙を取得して4択クイズを自動生成します。もし取得に失敗した場合は、取得できたソースだけで開始します。
     </p>
 
     <div class="bg-white rounded-lg shadow p-4 mb-4">
@@ -33,13 +38,17 @@
           <label class="block text-sm text-gray-600 mb-1">出題数（最大3000）</label>
           <input id="limitInput" class="w-full p-2 border rounded" type="number" value="3000" min="10" max="3000">
         </div>
-        <div class="flex items-end">
-          <button id="startBtn" class="btn bg-blue-600 text-white w-full">読み込み＆開始</button>
+        <div class="flex items-end gap-2">
+          <button id="startBtn" class="btn btn-primary w-full">読み込み＆開始</button>
         </div>
+      </div>
+      <div class="mt-3 flex gap-2">
+        <button id="reviewBtn" class="btn btn-secondary" disabled>復習モード（間違えだけ）</button>
+        <span class="muted text-xs">※直近のセッションで間違えた問題のみを出題</span>
       </div>
     </div>
 
-    <div id="status" class="text-sm text-gray-600 mb-2">準備中...</div>
+    <div id="status" class="text-sm text-gray-600 mb-2 mono">準備中...</div>
 
     <div id="quizCard" class="bg-white rounded-lg shadow p-4 hidden">
       <div class="flex items-center justify-between mb-2">
@@ -48,19 +57,25 @@
       </div>
       <div id="question" class="text-lg font-semibold mb-3">問題テキスト</div>
       <div id="choices" class="grid gap-2"></div>
-      <div id="score" class="mt-3 text-blue-600 font-bold">スコア: 0</div>
+      <div class="mt-3 flex items-center justify-between">
+        <div id="score" class="text-blue-600 font-bold">スコア: 0</div>
+        <div id="posChip" class="chip">品詞</div>
+      </div>
     </div>
 
+    <details class="mt-6">
+      <summary class="cursor-pointer text-sm font-semibold">診断ログ（開く）</summary>
+      <pre id="log" class="mono text-xs bg-white rounded p-3 shadow mt-2 overflow-auto" style="max-height:220px"></pre>
+    </details>
+
     <div class="mt-6 text-xs text-gray-500">
-      <h2 class="font-semibold mb-1">データ出典（敬称略・自動統合）</h2>
+      <h2 class="font-semibold mb-1">データ出典（自動統合）</h2>
       <ul class="list-disc ml-5 space-y-1">
-        <li>JLPT Vocabulary API（CORS対応）：<code>https://jlpt-vocab-api.vercel.app</code></li>
-        <li>open-anki-jlpt-decks（MIT）CSV：<code>https://github.com/jamsinclair/open-anki-jlpt-decks</code></li>
-        <li>jlpt-word-list（MIT）JSON：<code>https://github.com/elzup/jlpt-word-list</code></li>
-        <li>JLPT_Vocabulary（Tanos由来, CC BY）：<code>https://github.com/Bluskyo/JLPT_Vocabulary</code></li>
-        <li>辞書情報：JMdict / EDICT（EDRDG, CC BY-SA）</li>
+        <li>open-anki-jlpt-decks（MIT）CSV：<code>github.com/jamsinclair/open-anki-jlpt-decks</code></li>
+        <li>jlpt-word-list（MIT）JSON：<code>github.com/elzup/jlpt-word-list</code></li>
+        <li>JLPT_Vocabulary（CC BY）：<code>github.com/Bluskyo/JLPT_Vocabulary</code></li>
+        <li>（オプション）JLPT Vocabulary API（CORS状況により自動スキップ）</li>
       </ul>
-      <p class="mt-2">※ 出典の仕様変更・一時停止等で一部ソースが取得できない場合があります（その場合は取得できたソースのみで出題）。</p>
     </div>
   </div>
 
