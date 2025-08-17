@@ -1,40 +1,356 @@
-<!DOCTYPE html>
+<!doctype html>
+
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>基本情報技術者 1か月 記憶定着表（塗りつぶし可）</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Excel 日付クリック塗りつぶし</title>
+  <meta name="description" content="Excelのシートを読み込み、日付セルをクリックすると色を塗りつぶすシンプルなWebアプリ。ローカル保存・JSONエクスポート対応。" />
+  <!-- Tailwind CDN（デザイン用。不要なら削除可） -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS（xlsxパーサ） -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
-    .btn{padding:.45rem .75rem;border-radius:.5rem;font-weight:600}
-    .btn-primary{background:#2563eb;color:#fff}
-    .btn-secondary{background:#e5e7eb}
-    .cell{cursor:pointer; user-select:none;}
-    .cell.done{background:#bbf7d0;}           /* green-200 */
-    .cell.overdue{background:#fde68a;}        /* amber-200 */
-    .cell.today{outline:2px dashed #f43f5e; outline-offset:-4px;} /* rose-500 */
-    .sticky-th{position:sticky; left:0; z-index:2; background:white;}
-    .sticky-first{position:sticky; left:0; background:white; z-index:1;}
-    .nowrap{white-space:nowrap;}
-    .small{font-size:.72rem;}
+    /* テーブルの基本スタイル */
+    table.sheet { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: 12px; }
+    .sheet th, .sheet td { border: 1px solid #e5e7eb; padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sheet thead th { position: sticky; top: 0; background: #f8fafc; z-index: 2; }
+    .sheet .row-head { position: sticky; left: 0; background: #f8fafc; z-index: 1; width: 56px; min-width: 56px; }
+    .sheet td { cursor: default; }
+    .sheet td.date-cell { cursor: pointer; }
+    /* クリックで塗られる色（変数 --paint を使用） */
+    .sheet td.painted { background: var(--paint, #fef08a); }/* 大きいシートのときスクロール領域に影 */
+.scroll-shadow { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06); }
+
+/* スクロール時の見出し境界 */
+.sticky-divider { box-shadow: 0 1px 0 0 rgba(0,0,0,0.05); }
+
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
-  <div class="max-w-6xl mx-auto p-4 space-y-4">
-    <h1 class="text-2xl font-bold">基本情報技術者 1か月 記憶定着表（塗りつぶし可）</h1>
-    <p class="text-sm text-gray-600">標準復習間隔：0 / 0.5 / 1 / 2 / 3 / 4 / 5 / 6 / 7日。セルをタップ（クリック）すると「学習済み」に塗りつぶせます。進捗は端末に保存されます。</p>
+<body class="bg-slate-50 text-slate-800">
+  <header class="px-4 sm:px-6 lg:px-8 py-4 bg-white sticky top-0 z-30 border-b border-slate-200">
+    <div class="max-w-6xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h1 class="text-xl font-semibold tracking-tight">Excel 日付クリック塗りつぶし</h1>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white">
+          <span class="text-sm">塗り色</span>
+          <input id="colorPicker" type="color" class="w-8 h-8 p-0 border-0 cursor-pointer" value="#fef08a"/>
+        </label>
+        <button id="btnExportState" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800">状態をJSON保存</button>
+        <label class="px-3 py-2 rounded-xl bg-white border text-sm cursor-pointer hover:bg-slate-50">
+          JSON読込
+          <input id="importStateInput" type="file" accept="application/json" class="hidden" />
+        </label>
+        <button id="btnClear" class="px-3 py-2 rounded-xl bg-white border text-sm hover:bg-slate-50">塗りを全解除</button>
+        <a id="repoLink" class="text-sm underline text-slate-600 hover:text-slate-900" href="https://github.com/new" target="_blank" rel="noreferrer">GitHubに新規公開</a>
+      </div>
+    </div>
+  </header>  <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+    <!-- コントロールパネル -->
+    <section class="bg-white rounded-2xl border shadow-sm p-4 sm:p-6 mb-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <label class="flex items-center gap-3">
+          <span class="text-sm font-medium whitespace-nowrap">Excel 読み込み</span>
+          <input id="fileInput" class="block w-full text-sm" type="file" accept=".xlsx,.xls,.csv" />
+        </label>
+        <div class="flex items-center gap-2">
+          <label class="text-sm" for="sheetSelect">シート</label>
+          <select id="sheetSelect" class="text-sm border rounded-xl px-3 py-2 bg-white"></select>
+        </div>
+        <div class="text-xs text-slate-500" id="limitNote" hidden></div>
+        <div class="ml-auto text-xs text-slate-500" id="fileMeta"></div>
+      </div>
+    </section><!-- シート表示領域 -->
+<section class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+  <div class="sticky top-[72px] bg-white sticky-divider px-4 py-2 text-sm text-slate-600 flex items-center justify-between">
+    <div>日付セルをクリックで <span class="font-semibold">塗り/解除</span> できます（ローカルに自動保存）</div>
+    <div class="hidden sm:block text-xs">※ Excel自体の塗りは変更されません。共有したい場合は「状態をJSON保存」を使ってください。</div>
+  </div>
+  <div id="tableWrap" class="max-h-[70vh] overflow-auto scroll-shadow">
+    <div class="p-6 text-sm text-slate-500">上の「Excel 読み込み」から .xlsx/.xls/.csv を選んでください。</div>
+  </div>
+</section>
 
-    <div class="bg-white rounded-lg shadow p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div class="flex items-end gap-2">
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">開始日</label>
-          <input id="startDate" type="date" class="p-2 border rounded" />
-        </div>
-        <div>
-          <label class="block text-sm text-gray-600 mb-1">1日の新規項目数</label>
-          <input id="perDay" type="number" min="1" max="10" value="3" class="p-2 border rounded w-24" />
-        </div>
-        <button id="rebuildBtn" class="btn btn-primary">再生成</button>
+<!-- 使い方 -->
+<section class="mt-6 text-sm text-slate-600 leading-7">
+  <h2 class="text-base font-semibold mb-2">使い方</h2>
+  <ol class="list-decimal ml-6 space-y-1">
+    <li>「Excel 読み込み」でファイルを選びます（ブラウザ内でのみ処理。アップロードされません）。</li>
+    <li>シートを選択すると内容が表で表示されます。</li>
+    <li>日付が入っているセルをクリックすると塗り/解除されます。</li>
+    <li>塗り状態は <span class="font-semibold">localStorage</span> に自動保存され、次回同じファイルを開くと復元されます。</li>
+    <li>共有したい場合は「状態をJSON保存」で書き出し、「JSON読込」で別端末でも復元できます。</li>
+  </ol>
+  <p class="mt-3 text-xs text-slate-500">※ このアプリはExcelファイル自体のスタイルを書き換えません（SheetJSの無償版ではセル塗り書き出しが非対応のため）。必要なら拡張実装も可能です。</p>
+</section>
+
+  </main>  <script>
+    // ====== ユーティリティ ======
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+
+    const textEncoder = new TextEncoder();
+
+    async function sha256Hex(ab) {
+      const hash = await crypto.subtle.digest('SHA-256', ab);
+      return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function downloadFile(filename, data, type='application/octet-stream') {
+      const blob = new Blob([data], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function columnLabel(n) { // 0-index -> A, B, ...
+      let s = ''; n++;
+      while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+      return s;
+    }
+
+    function looksLikeDateFormat(z) {
+      if (!z || typeof z !== 'string') return false;
+      // Excelの表示形式で日付っぽいかをざっくり判定
+      return /(y|m{1,4}|d{1,4}|yy|yyyy|mmm|dddd)/i.test(z) && !/h+:?m+/i.test(z); // 時刻のみは除外
+    }
+
+    function looksLikeDateText(w) {
+      if (!w || typeof w !== 'string') return false;
+      // 2025/08/17, 2025-08-17, 8/17, 8-17 などざっくり
+      return /^(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2})$/.test(w.trim());
+    }
+
+    function fmtCell(cell) {
+      try { return XLSX.utils.format_cell(cell); } catch { return String(cell?.v ?? ''); }
+    }
+
+    // ====== アプリ状態 ======
+    let g = {
+      ab: null, // ArrayBuffer of file
+      fileName: '',
+      fileHash: '',
+      wb: null, // XLSX.WorkBook
+      sheetName: '',
+      sheetLimit: { maxRows: 800, maxCols: 120 }, // レンダリング制限（重すぎ対策）
+      paintColor: '#fef08a',
+    };
+
+    function makeStorageKey(fileHash, sheetName) {
+      return `paint:${fileHash}:${sheetName}`;
+    }
+
+    function loadLocalState(fileHash, sheetName) {
+      const raw = localStorage.getItem(makeStorageKey(fileHash, sheetName));
+      if (!raw) return { color: g.paintColor, cells: [] };
+      try { return JSON.parse(raw); } catch { return { color: g.paintColor, cells: [] }; }
+    }
+
+    function saveLocalState(fileHash, sheetName, state) {
+      localStorage.setItem(makeStorageKey(fileHash, sheetName), JSON.stringify(state));
+    }
+
+    // ====== DOM refs ======
+    const fileInput = document.getElementById('fileInput');
+    const sheetSelect = document.getElementById('sheetSelect');
+    const tableWrap = document.getElementById('tableWrap');
+    const colorPicker = document.getElementById('colorPicker');
+    const btnExportState = document.getElementById('btnExportState');
+    const importStateInput = document.getElementById('importStateInput');
+    const btnClear = document.getElementById('btnClear');
+    const fileMeta = document.getElementById('fileMeta');
+    const limitNote = document.getElementById('limitNote');
+
+    // ====== ファイル読込 ======
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      g.fileName = f.name;
+      const ab = await f.arrayBuffer();
+      g.ab = ab;
+      g.fileHash = await sha256Hex(ab);
+      fileMeta.textContent = `${g.fileName} / SHA-256: ${g.fileHash.slice(0, 10)}…`;
+
+      // CSVは内部でシート化される
+      const wb = XLSX.read(ab, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+      g.wb = wb;
+      sheetSelect.innerHTML = '';
+      wb.SheetNames.forEach((name, i) => {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name; if (i === 0) opt.selected = true;
+        sheetSelect.appendChild(opt);
+      });
+      g.sheetName = wb.SheetNames[0] || '';
+      renderSheet(g.sheetName);
+    });
+
+    sheetSelect.addEventListener('change', (e) => {
+      g.sheetName = e.target.value;
+      renderSheet(g.sheetName);
+    });
+
+    colorPicker.addEventListener('input', () => {
+      g.paintColor = colorPicker.value || '#fef08a';
+      const table = tableWrap.querySelector('table.sheet');
+      if (table) table.style.setProperty('--paint', g.paintColor);
+      // ついでに保存中の色も更新
+      const st = loadLocalState(g.fileHash, g.sheetName);
+      st.color = g.paintColor; saveLocalState(g.fileHash, g.sheetName, st);
+    });
+
+    btnExportState.addEventListener('click', () => {
+      if (!g.fileHash || !g.sheetName) return;
+      const st = loadLocalState(g.fileHash, g.sheetName);
+      const payload = { version: 1, fileHash: g.fileHash, sheetName: g.sheetName, ...st };
+      downloadFile(`paint-state_${g.sheetName}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    });
+
+    importStateInput.addEventListener('change', async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const text = await f.text();
+      try {
+        const obj = JSON.parse(text);
+        if (!obj || typeof obj !== 'object' || !obj.sheetName || !obj.fileHash) throw new Error('形式が不正です');
+        // 現在のファイルとハッシュが違うと適用せず警告
+        if (obj.fileHash !== g.fileHash) {
+          alert('この状態JSONは異なるExcelファイルのものです。元のExcelを開いた上で再度読み込んでください。');
+          importStateInput.value = '';
+          return;
+        }
+        saveLocalState(g.fileHash, obj.sheetName, { color: obj.color || '#fef08a', cells: obj.cells || [] });
+        if (obj.sheetName === g.sheetName) applyPaintFromState();
+        alert('状態を適用しました。');
+      } catch (err) {
+        alert('JSONの読み込みに失敗しました: ' + err.message);
+      } finally {
+        importStateInput.value = '';
+      }
+    });
+
+    btnClear.addEventListener('click', () => {
+      if (!g.fileHash || !g.sheetName) return;
+      const table = tableWrap.querySelector('table.sheet');
+      if (!table) return;
+      table.querySelectorAll('td.painted').forEach(td => td.classList.remove('painted'));
+      saveLocalState(g.fileHash, g.sheetName, { color: g.paintColor, cells: [] });
+    });
+
+    // ====== レンダリング ======
+    function renderSheet(name) {
+      const ws = g.wb?.Sheets?.[name];
+      if (!ws) { tableWrap.innerHTML = '<div class="p-6 text-sm text-slate-500">このシートは空です。</div>'; return; }
+
+      const ref = ws['!ref'] || 'A1';
+      const range = XLSX.utils.decode_range(ref);
+      const totalRows = (range.e.r - range.s.r + 1);
+      const totalCols = (range.e.c - range.s.c + 1);
+
+      const maxRows = Math.min(totalRows, g.sheetLimit.maxRows);
+      const maxCols = Math.min(totalCols, g.sheetLimit.maxCols);
+
+      limitNote.hidden = (totalRows <= maxRows && totalCols <= maxCols);
+      if (!limitNote.hidden) {
+        limitNote.textContent = `表示を制限しています（${maxRows}/${totalRows} 行, ${maxCols}/${totalCols} 列）。必要なら上限値をコード内で調整してください。`;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'sheet';
+      table.style.setProperty('--paint', g.paintColor);
+
+      const thead = document.createElement('thead');
+      const thr = document.createElement('tr');
+      const corner = document.createElement('th');
+      corner.className = 'row-head'; corner.textContent = '#';
+      thr.appendChild(corner);
+      for (let c = 0; c < maxCols; c++) {
+        const th = document.createElement('th');
+        th.textContent = columnLabel(c);
+        thr.appendChild(th);
+      }
+      thead.appendChild(thr);
+
+      const tbody = document.createElement('tbody');
+      for (let r = 0; r < maxRows; r++) {
+        const tr = document.createElement('tr');
+        const rowHead = document.createElement('th');
+        rowHead.className = 'row-head'; rowHead.textContent = (r + 1).toString();
+        tr.appendChild(rowHead);
+        for (let c = 0; c < maxCols; c++) {
+          const rr = range.s.r + r;
+          const cc = range.s.c + c;
+          const addr = XLSX.utils.encode_cell({ r: rr, c: cc });
+          const cell = ws[addr];
+          const td = document.createElement('td');
+          td.dataset.addr = addr;
+
+          let isDate = false;
+          if (cell) {
+            const t = cell.t;
+            if (t === 'd') isDate = true; // 既に日付型
+            else if (t === 'n' && looksLikeDateFormat(cell.z)) isDate = true; // 数値 + 日付書式
+            else if ((t === 's' || t === 'n') && looksLikeDateText(cell.w || cell.v)) isDate = true; // 文字列上で日付らしい
+            td.textContent = fmtCell(cell);
+          } else {
+            td.textContent = '';
+          }
+
+          if (isDate) {
+            td.classList.add('date-cell');
+            td.title = `クリックで塗り/解除 (${addr})`;
+            td.addEventListener('click', () => togglePaint(td));
+          }
+
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+
+      tableWrap.innerHTML = '';
+      tableWrap.appendChild(table);
+
+      applyPaintFromState();
+    }
+
+    function togglePaint(td) {
+      td.classList.toggle('painted');
+      persistPaint();
+    }
+
+    function persistPaint() {
+      if (!g.fileHash || !g.sheetName) return;
+      const table = tableWrap.querySelector('table.sheet');
+      if (!table) return;
+      const addrs = $$('.painted', table).map(td => td.dataset.addr).filter(Boolean);
+      saveLocalState(g.fileHash, g.sheetName, { color: g.paintColor, cells: addrs });
+    }
+
+    function applyPaintFromState() {
+      const table = tableWrap.querySelector('table.sheet');
+      if (!table) return;
+      const st = loadLocalState(g.fileHash, g.sheetName);
+      g.paintColor = st.color || g.paintColor; // カラーピッカーも同期
+      colorPicker.value = g.paintColor;
+      table.style.setProperty('--paint', g.paintColor);
+      // いったん全解除
+      table.querySelectorAll('td.painted').forEach(td => td.classList.remove('painted'));
+      // 適用
+      (st.cells || []).forEach(addr => {
+        const td = table.querySelector(`td[data-addr="${addr}"]`);
+        if (td) td.classList.add('painted');
+      });
+    }
+
+    // 初期化（色だけ反映）
+    document.addEventListener('DOMContentLoaded', () => {
+      const table = tableWrap.querySelector('table.sheet');
+      if (table) table.style.setProperty('--paint', g.paintColor);
+    });
+  </script></body>
+</html>        <button id="rebuildBtn" class="btn btn-primary">再生成</button>
         <button id="todayBtn" class="btn btn-secondary">今日へジャンプ</button>
       </div>
       <div class="flex flex-wrap gap-2">
