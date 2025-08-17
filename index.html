@@ -3,82 +3,339 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>JLPT N1 語彙クイズ（最大3000問・5秒制限）</title>
+  <title>基本情報技術者 1か月 記憶定着表（塗りつぶし可）</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    .btn{padding:.5rem .75rem;border-radius:.5rem;font-weight:600}
+    .btn{padding:.45rem .75rem;border-radius:.5rem;font-weight:600}
     .btn-primary{background:#2563eb;color:#fff}
     .btn-secondary{background:#e5e7eb}
-    .muted{color:#6b7280}
-    .chip{display:inline-block;padding:.15rem .5rem;background:#eef2ff;border-radius:9999px;font-size:.75rem;margin-left:.5rem}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .cell{cursor:pointer; user-select:none;}
+    .cell.done{background:#bbf7d0;}           /* green-200 */
+    .cell.overdue{background:#fde68a;}        /* amber-200 */
+    .cell.today{outline:2px dashed #f43f5e; outline-offset:-4px;} /* rose-500 */
+    .sticky-th{position:sticky; left:0; z-index:2; background:white;}
+    .sticky-first{position:sticky; left:0; background:white; z-index:1;}
+    .nowrap{white-space:nowrap;}
+    .small{font-size:.72rem;}
   </style>
 </head>
-<body class="bg-gray-100 text-gray-900">
-  <div class="max-w-3xl mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-2">JLPT N1 語彙クイズ（最大3000問・5秒制限）</h1>
-    <p class="text-sm text-gray-600 mb-4">
-      公開データからN1語彙を取得して4択クイズを自動生成します。もし取得に失敗した場合は、取得できたソースだけで開始します。
-    </p>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-6xl mx-auto p-4 space-y-4">
+    <h1 class="text-2xl font-bold">基本情報技術者 1か月 記憶定着表（塗りつぶし可）</h1>
+    <p class="text-sm text-gray-600">標準復習間隔：0 / 0.5 / 1 / 2 / 3 / 4 / 5 / 6 / 7日。セルをタップ（クリック）すると「学習済み」に塗りつぶせます。進捗は端末に保存されます。</p>
 
-    <div class="bg-white rounded-lg shadow p-4 mb-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div class="bg-white rounded-lg shadow p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="flex items-end gap-2">
         <div>
-          <label class="block text-sm text-gray-600 mb-1">カテゴリー（品詞）</label>
-          <select id="categorySelect" class="w-full p-2 border rounded">
-            <option value="all">すべて</option>
-            <option value="名詞">名詞</option>
-            <option value="動詞">動詞</option>
-            <option value="形容詞">形容詞</option>
-            <option value="副詞">副詞</option>
-            <option value="その他">その他</option>
-          </select>
+          <label class="block text-sm text-gray-600 mb-1">開始日</label>
+          <input id="startDate" type="date" class="p-2 border rounded" />
         </div>
         <div>
-          <label class="block text-sm text-gray-600 mb-1">出題数（最大3000）</label>
-          <input id="limitInput" class="w-full p-2 border rounded" type="number" value="3000" min="10" max="3000">
+          <label class="block text-sm text-gray-600 mb-1">1日の新規項目数</label>
+          <input id="perDay" type="number" min="1" max="10" value="3" class="p-2 border rounded w-24" />
         </div>
-        <div class="flex items-end gap-2">
-          <button id="startBtn" class="btn btn-primary w-full">読み込み＆開始</button>
-        </div>
+        <button id="rebuildBtn" class="btn btn-primary">再生成</button>
+        <button id="todayBtn" class="btn btn-secondary">今日へジャンプ</button>
       </div>
-      <div class="mt-3 flex gap-2">
-        <button id="reviewBtn" class="btn btn-secondary" disabled>復習モード（間違えだけ）</button>
-        <span class="muted text-xs">※直近のセッションで間違えた問題のみを出題</span>
+      <div class="flex flex-wrap gap-2">
+        <button id="exportBtn" class="btn btn-secondary">進捗をエクスポート</button>
+        <label class="btn btn-secondary cursor-pointer">
+          進捗をインポート
+          <input id="importInput" type="file" accept="application/json" class="hidden" />
+        </label>
+        <button id="resetBtn" class="btn btn-secondary">全部リセット</button>
       </div>
     </div>
 
-    <div id="status" class="text-sm text-gray-600 mb-2 mono">準備中...</div>
-
-    <div id="quizCard" class="bg-white rounded-lg shadow p-4 hidden">
-      <div class="flex items-center justify-between mb-2">
-        <div id="progress" class="text-sm text-gray-500">0 / 0</div>
-        <div id="timer" class="text-red-600 font-bold text-lg">5</div>
-      </div>
-      <div id="question" class="text-lg font-semibold mb-3">問題テキスト</div>
-      <div id="choices" class="grid gap-2"></div>
-      <div class="mt-3 flex items-center justify-between">
-        <div id="score" class="text-blue-600 font-bold">スコア: 0</div>
-        <div id="posChip" class="chip">品詞</div>
-      </div>
+    <div class="bg-white rounded-lg shadow p-3">
+      <h2 class="font-semibold mb-2">今日のToDo</h2>
+      <div id="todayList" class="text-sm text-gray-800"></div>
     </div>
 
-    <details class="mt-6">
-      <summary class="cursor-pointer text-sm font-semibold">診断ログ（開く）</summary>
-      <pre id="log" class="mono text-xs bg-white rounded p-3 shadow mt-2 overflow-auto" style="max-height:220px"></pre>
-    </details>
+    <div class="bg-white rounded-lg shadow p-3 overflow-auto">
+      <table id="grid" class="min-w-full text-sm">
+        <thead class="sticky top-0 bg-white z-10">
+          <tr>
+            <th class="sticky-th p-2 text-left">学習項目</th>
+            <th class="p-2 nowrap">初回</th>
+            <th class="p-2 nowrap">0</th>
+            <th class="p-2 nowrap">0.5 (夜)</th>
+            <th class="p-2 nowrap">1</th>
+            <th class="p-2 nowrap">2</th>
+            <th class="p-2 nowrap">3</th>
+            <th class="p-2 nowrap">4</th>
+            <th class="p-2 nowrap">5</th>
+            <th class="p-2 nowrap">6</th>
+            <th class="p-2 nowrap">7</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
 
-    <div class="mt-6 text-xs text-gray-500">
-      <h2 class="font-semibold mb-1">データ出典（自動統合）</h2>
-      <ul class="list-disc ml-5 space-y-1">
-        <li>open-anki-jlpt-decks（MIT）CSV：<code>github.com/jamsinclair/open-anki-jlpt-decks</code></li>
-        <li>jlpt-word-list（MIT）JSON：<code>github.com/elzup/jlpt-word-list</code></li>
-        <li>JLPT_Vocabulary（CC BY）：<code>github.com/Bluskyo/JLPT_Vocabulary</code></li>
-        <li>（オプション）JLPT Vocabulary API（CORS状況により自動スキップ）</li>
+    <details class="bg-white rounded-lg shadow p-3">
+      <summary class="cursor-pointer font-semibold">ヘルプ</summary>
+      <ul class="list-disc ml-5 text-sm text-gray-700 space-y-1 mt-2">
+        <li>セルをタップ（クリック）で状態を切り替え：未完 → 完了（緑）。</li>
+        <li>「今日のToDo」からもチェックすると、表側のセルが連動して塗られます。</li>
+        <li>進捗は端末の <code>localStorage</code> に保存。エクスポート/インポートで他端末に移行可能。</li>
+        <li>開始日や1日の新規数を変えたら「再生成」。</li>
       </ul>
-    </div>
+    </details>
   </div>
 
-  <script src="./main.js"></script>
+  <script>
+  // ---------------- Topics (目次) ----------------
+  const TOPICS = [
+    "01 データの単位","02 数値の数え方","03 基数変換と桁の話","04 さまざまな記数法変換",
+    "05 負の2進数","06 2進数の四則演算",
+    "07 集合と論理演算","08 論理回路","09 計算式の表し方","10 オートマトン","11 AI（人工知能）",
+    "12 データ構造","13 アルゴリズムの基本","14 アルゴリズムの分類","15 プログラムの性質と種類","16 その他の言語",
+    "17 CPU（プロセッサ）","18 CPUが処理する流れ","19 記憶装置","20 入出力装置",
+    "21 システムの分類","22 システム構成による分類","23 システムの性能指標","24 システムの信頼性指標",
+    "25 OS","26 データ管理とファイルシステム","27 バックアップ","28 開発ツール","29 オープンソースソフトウェア",
+    "30 半導体メモリ","31 電子回路",
+    "32 ヒューマンインターフェース技術","33 インタフェース設計","34 マルチメディア技術",
+    "35 データベースの基本","36 関係データベース","37 データベース設計","38 データベース管理システム",
+    "39 トランザクション管理","40 排他制御",
+    "41 回線","42 LANとWAN","43 IPアドレス","44 サブネットマスク","45 グローバル/プライベートIP",
+    "46 ドメイン名","47 通信プロトコル","48 インターネット応用",
+    "49 セキュリティの脅威","50 暗号技術の基本","51 デジタル署名と認証局","52 リスクマネジメント",
+    "53 セキュリティマネジメント","54 脅威への対策",
+    "55 システム開発技術","56 システム要件定義","57 システム設計","58 プログラミングとオブジェクト指向","59 テスト",
+    "60 ソフトウェア開発モデル",
+    "61 プロジェクトマネジメント","62 スコープマネジメント","63 リソースマネジメント","64 タイムマネジメント",
+    "65 コストマネジメント","66 リスクマネジメント",
+    "67 サービスマネジメント","68 サービスレベル管理","69 サービスデスク","70 ファシリティマネジメント",
+    "71 システム監査","72 内部統制",
+    "73 情報システム戦略","74 業務プロセス","75 ソリューションビジネス","76 活用促進と評価",
+    "77 システム企画","78 調達計画・実施",
+    "79 経営戦略","80 会社戦略","81 事業戦略","82 評価","83 マーケティング","84 組織マネジメント","85 財務",
+    "86 法務","87 知的財産","88 セキュリティ関連法","89 労働関連法",
+    "90 試験対策（科目Bの合格戦略）"
+  ];
+  const INTERVALS = [0, 0.5, 1, 2, 3, 4, 5, 6, 7];
+  const COL_KEYS = ["init","0","0.5","1","2","3","4","5","6","7"]; // init + intervals
+  const STORAGE_KEY = "fe_memory_plan_v1";
+
+  // --------- helpers ---------
+  const fmtYMD = (d) => d.toISOString().slice(0,10);
+  const fmtMD = (d) => `${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+  function addDays(base, days){
+    const ms = base.getTime() + days*24*60*60*1000;
+    return new Date(ms);
+  }
+  function allocate(topics, startDate, perDay){
+    const plan = []; // [{topic, dates:{init, "0","0.5","1"...}}]
+    let dayIndex = 0;
+    for (let i=0; i<topics.length; ){
+      const count = Math.min(perDay, topics.length - i);
+      const initial = addDays(startDate, dayIndex);
+      for (let k=0; k<count; k++){
+        const t = topics[i+k];
+        const dates = {"init": fmtYMD(initial)};
+        for (const iv of INTERVALS){
+          const d = addDays(initial, iv);
+          const key = String(iv);
+          dates[key] = fmtYMD(d);
+        }
+        plan.push({topic: t, dates});
+      }
+      i += count;
+      dayIndex += 1;
+    }
+    return plan;
+  }
+
+  // --------- state ---------
+  let startDate = new Date();
+  let perDay = 3;
+  let plan = [];           // allocate result
+  let progress = {};       // { startDateYMD: { "<topicIndex>|<colKey>": true } }
+
+  // Load progress
+  function loadProgress(){
+    try{
+      progress = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    }catch{ progress = {}; }
+  }
+  function saveProgress(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  }
+  function getKeyForDate(d){ return fmtYMD(d); }
+
+  // mark helpers
+  function isDone(topicIndex, colKey){
+    const planKey = getKeyForDate(startDate);
+    const store = progress[planKey] || {};
+    return !!store[`${topicIndex}|${colKey}`];
+  }
+  function toggleDone(topicIndex, colKey){
+    const planKey = getKeyForDate(startDate);
+    if(!progress[planKey]) progress[planKey] = {};
+    const k = `${topicIndex}|${colKey}`;
+    progress[planKey][k] = !progress[planKey][k];
+    saveProgress();
+  }
+
+  // --------- UI build ---------
+  const tbody = document.getElementById("tbody");
+  function rebuildGrid(){
+    tbody.innerHTML = "";
+    // header inputs reflect
+    document.getElementById("startDate").value = fmtYMD(startDate);
+    document.getElementById("perDay").value = perDay;
+    const todayYMD = fmtYMD(new Date());
+
+    plan = allocate(TOPICS, startDate, perDay);
+
+    plan.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+      // topic cell
+      const tdTopic = document.createElement("td");
+      tdTopic.className = "sticky-first p-2 border-b border-gray-200 bg-white";
+      tdTopic.textContent = row.topic;
+      tr.appendChild(tdTopic);
+
+      // columns: init + intervals
+      // init
+      const initDate = row.dates["init"];
+      tr.appendChild(makeCell(idx, "init", initDate, todayYMD));
+
+      for (const iv of INTERVALS){
+        const key = String(iv);
+        const d = row.dates[key];
+        const label = key === "0.5" ? d + " 夜" : d;
+        tr.appendChild(makeCell(idx, key, label, todayYMD, d));
+      }
+      tbody.appendChild(tr);
+    });
+
+    renderTodayList();
+  }
+
+  function makeCell(idx, colKey, label, todayYMD, rawYMD=null){
+    const td = document.createElement("td");
+    td.className = "cell text-center p-2 border-b border-gray-100";
+    td.dataset.idx = idx;
+    td.dataset.col = colKey;
+    td.title = label;
+
+    // visual date (MM/DD) only
+    const ymd = (rawYMD || label).slice(0,10);
+    const d = new Date(ymd);
+    const visual = (colKey==="0.5") ? fmtMD(d) + " 夜" : fmtMD(d);
+    td.innerHTML = `<span class="small">${visual}</span>`;
+
+    // state
+    if (isDone(idx, colKey)) td.classList.add("done");
+    if (ymd < todayYMD) td.classList.add("overdue");
+    if (ymd === todayYMD) td.classList.add("today");
+
+    // toggle
+    td.addEventListener("click", () => {
+      toggleDone(idx, colKey);
+      td.classList.toggle("done");
+    });
+    return td;
+  }
+
+  // --------- Today list ---------
+  function renderTodayList(){
+    const box = document.getElementById("todayList");
+    const today = new Date();
+    const todayYMD = fmtYMD(today);
+    const items = [];
+    plan.forEach((row, idx) => {
+      for (const key of COL_KEYS){
+        const ymd = row.dates[key];
+        if (!ymd) continue;
+        if (ymd === todayYMD){
+          const title = (key==="0.5") ? `${row.topic}（夜）` : row.topic;
+          items.push({idx, key, title});
+        }
+      }
+    });
+    if (!items.length){
+      box.innerHTML = `<p class="text-gray-500">本日分はありません。</p>`;
+      return;
+    }
+    // list
+    box.innerHTML = "";
+    const ul = document.createElement("ul");
+    ul.className = "list-disc ml-5";
+    items.forEach(item => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.className = "underline text-blue-600";
+      btn.textContent = item.title;
+      btn.addEventListener("click", () => {
+        // toggle and sync cell
+        toggleDone(item.idx, item.key);
+        // find cell and toggle class
+        const selector = `td.cell[data-idx="${item.idx}"][data-col="${item.key}"]`;
+        const cell = document.querySelector(selector);
+        if (cell) cell.classList.toggle("done");
+      });
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  }
+
+  // --------- Controls ---------
+  document.getElementById("rebuildBtn").addEventListener("click", () => {
+    const d = document.getElementById("startDate").value;
+    startDate = d ? new Date(d+"T00:00:00") : new Date();
+    perDay = Math.max(1, Math.min(10, parseInt(document.getElementById("perDay").value||"3",10)));
+    rebuildGrid();
+  });
+  document.getElementById("todayBtn").addEventListener("click", () => {
+    const todayYMD = fmtYMD(new Date());
+    const cell = document.querySelector(`td.cell.today`);
+    if (cell) cell.scrollIntoView({behavior:"smooth", block:"center"});
+  });
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if (!confirm("すべての塗りつぶしを消去します。よろしいですか？")) return;
+    const key = getKeyForDate(startDate);
+    if (progress[key]) delete progress[key];
+    saveProgress();
+    rebuildGrid();
+  });
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const dataStr = JSON.stringify(progress, null, 2);
+    const blob = new Blob([dataStr], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "fe_memory_progress.json";
+    a.click();
+  });
+  document.getElementById("importInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        progress = JSON.parse(reader.result);
+        saveProgress();
+        rebuildGrid();
+        alert("インポートしました。");
+      }catch(err){
+        alert("JSONの読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // --------- init ---------
+  (function init(){
+    loadProgress();
+    const d = new Date();
+    document.getElementById("startDate").value = fmtYMD(d);
+    startDate = d;
+    perDay = 3;
+    rebuildGrid();
+  })();
+  </script>
 </body>
 </html>
