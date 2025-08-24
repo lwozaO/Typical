@@ -4,37 +4,258 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>JLPT N1 読解SRSプランナー</title>
+  <title>JLPT N1 読解SRS（大量記憶表・日付塗りつぶし）</title>
   <style>
     :root{
-      --bg:#0b0c10; /* ダーク基調で目の負担軽減 */
-      --card:#14161a;
-      --ink:#e8ecf1;
-      --muted:#a7b0bb;
-      --brand:#5bbad5;
-      --accent:#5ed38d;
-      --danger:#ff6b6b;
-      --warn:#ffd166;
-      --line:#23262b;
+      --bg:#0c0f13; --card:#12161c; --ink:#e9eef4; --muted:#a6b0bb; --line:#222830;
+      --brand:#64d6a3; --accent:#57b1ff; --warn:#ffd166; --done:#2dd4bf; --today:#345;
     }
+    *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      margin:0; font-family:"Meiryo UI", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-      background:linear-gradient(180deg,#0b0c10 0%,#0e1116 100%);
-      color:var(--ink);
-      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    }
-    .wrap{max-width:1100px; margin:0 auto; padding:16px;}
-    header{display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;}
-    h1{font-size:22px; margin:8px 0}
+    body{margin:0; font-family:"Meiryo UI", system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; background:linear-gradient(180deg,#0c0f13 0%,#0e1217 100%); color:var(--ink)}
+    .wrap{max-width:1100px; margin:0 auto; padding:14px}
+    header{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+    h1{font-size:20px; margin:6px 0}
     .sub{color:var(--muted); font-size:13px}
-    .row{display:flex; gap:12px; flex-wrap:wrap}
-    .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.22)}
-    .card h2{font-size:16px; margin:4px 0 10px}
-    .card h3{font-size:14px; margin:0 0 8px; color:var(--muted)}
-    .grid{display:grid; gap:12px}
-    .grid.cols-2{grid-template-columns:1fr}
-    .grid.cols-3{grid-template-columns:1fr}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.22); margin-top:10px}
+    label{font-size:12px; color:var(--muted); display:block; margin-bottom:4px}
+    input, select{width:100%; padding:10px 12px; background:#0e1217; color:var(--ink); border:1px solid var(--line); border-radius:10px}
+    .row{display:flex; gap:8px; flex-wrap:wrap}
+    .btn{appearance:none; border:none; background:var(--accent); color:#04121d; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer}
+    .btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line)}
+    .btn.warn{background:var(--warn); color:#241b00}
+    .btn.danger{background:#ff6b6b; color:#fff}
+    .btn.small{padding:6px 10px; border-radius:10px; font-size:12px}
+    .chip{font-size:11px; padding:4px 8px; border-radius:999px; background:#0e1217; border:1px solid var(--line); color:var(--muted)}
+    .good{background:rgba(45,212,191,.18); border-color:rgba(45,212,191,.35); color:#a7fff0}
+    .todayMark{background:rgba(86,148,255,.18); border-color:rgba(86,148,255,.4); color:#cfe4ff}.grid{display:grid; gap:10px}
+.grid.cols-3{grid-template-columns:1fr}
+@media(min-width:900px){.grid.cols-3{grid-template-columns:1.2fr 1fr 1fr}}
+
+.tableWrap{overflow:auto; border:1px solid var(--line); border-radius:12px}
+table{border-collapse:separate; border-spacing:0; width:100%; font-size:13px}
+th,td{border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:8px 6px; text-align:left; white-space:nowrap}
+th:last-child, td:last-child{border-right:none}
+thead th{position:sticky; top:0; background:#0f141b; z-index:2}
+tbody th{position:sticky; left:0; background:#0f141b; z-index:1}
+tbody th.group{background:#0d1218; color:var(--muted); font-weight:600}
+.cell{min-width:76px; text-align:center; border-radius:8px; cursor:pointer; user-select:none}
+.cell.done{background:var(--done); color:#04121d; font-weight:700}
+.cell.past:not(.done){opacity:.45}
+.cell.today{outline:2px solid #457bff; outline-offset:-2px}
+.hint{color:var(--muted); font-size:12px}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>JLPT N1 読解SRS（塗りつぶし表）</h1>
+        <div class="sub">あなたは「日付セルをタップして塗る」だけ。項目名・見出し・番号は自動生成します。</div>
+      </div>
+      <div class="row">
+        <span class="chip" id="todayChip">今日: -</span>
+        <span class="chip" id="examChip">試験日: -</span>
+      </div>
+    </header><section class="card">
+  <div class="grid cols-3">
+    <div>
+      <label>開始日</label>
+      <input type="date" id="startDate"/>
+    </div>
+    <div>
+      <label>試験日</label>
+      <input type="date" id="examDate"/>
+    </div>
+    <div>
+      <label>復習間隔（固定）</label>
+      <div class="chip">0.5 / 1 / 2 / 4 / 7 / 14 / 21 / 28（日）</div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button class="btn" id="genBtn">スケジュール自動生成（上書き）</button>
+    <button class="btn ghost" id="todayOnlyBtn">今日だけ表示/解除</button>
+    <button class="btn warn" id="clearMarksBtn">塗りつぶしを全て消す</button>
+  </div>
+  <div class="hint">※ 自動生成すると既存の行は上書きされます（塗りつぶしは保持します）。</div>
+</section>
+
+<section class="card">
+  <h3 style="margin:0 0 8px">今日のタスク</h3>
+  <div id="todayList" class="row" style="gap:6px; flex-wrap:wrap"></div>
+</section>
+
+<section class="card">
+  <div class="tableWrap">
+    <table id="grid">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="hint" style="margin-top:6px">セルをタップ/クリックで塗りつぶし（もう一度で解除）。</div>
+</section>
+
+  </div><script>
+(function(){
+  const STORAGE_KEY = 'jlptn1_simple_srs_v1';
+  const $ = s=>document.querySelector(s);
+
+  // ====== dates ======
+  function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
+  function addDays(d,days){const x=new Date(d);x.setDate(x.getDate()+Math.floor(days));return x}
+  function addFracDaysAsDate(d,days){ // 0.5日は同日扱い
+    return days<1? startOfDay(d) : addDays(d,days);
+  }
+  function fmt(d){const m=d.getMonth()+1;const dd=d.getDate();return `${m}/${dd}`}
+  function toInput(d){ const z=new Date(d.getTime()-d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); }
+  function fromInput(s){ return startOfDay(new Date(s)); }
+  function firstSundayOfDecember(year){const d=new Date(year,11,1);while(d.getDay()!==0)d.setDate(d.getDate()+1);return startOfDay(d)}
+  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()}
+
+  const today = startOfDay(new Date());
+  $('#todayChip').textContent = `今日: ${fmt(today)}`;
+
+  // defaults
+  const defExam = firstSundayOfDecember(new Date().getFullYear());
+  $('#startDate').value = toInput(today);
+  $('#examDate').value = toInput(defExam);
+  $('#examChip').textContent = `試験日: ${fmt(defExam)}`;
+
+  // model
+  let db = load() || { start: toInput(today), exam: toInput(defExam), rows: [], marks:{} };
+  $('#startDate').value = db.start;
+  $('#examDate').value = db.exam;
+  $('#examChip').textContent = `試験日: ${fmt(fromInput(db.exam))}`;
+
+  const INTERVALS = [0.5,1,2,4,7,14,21,28];
+
+  // events
+  $('#genBtn').addEventListener('click', regenerate);
+  $('#todayOnlyBtn').addEventListener('click', ()=>{ state.todayOnly=!state.todayOnly; render(); });
+  $('#clearMarksBtn').addEventListener('click', ()=>{ if(confirm('全ての塗りつぶしを消しますか？')){ db.marks={}; save(); render(); }});
+  $('#startDate').addEventListener('change', ()=>{ db.start=$('#startDate').value; save(); });
+  $('#examDate').addEventListener('change', ()=>{ db.exam=$('#examDate').value; save(); $('#examChip').textContent=`試験日: ${fmt(fromInput(db.exam))}`; });
+
+  const state = { todayOnly:false };
+
+  // initial draw
+  if(!db.rows.length) regenerate(); else render();
+
+  // ====== generation ======
+  function regenerate(){
+    const start = fromInput($('#startDate').value||db.start);
+    const exam = fromInput($('#examDate').value||db.exam);
+    if(!(start<exam)) { alert('開始日が試験日より前である必要があります'); return; }
+
+    // keep old marks
+    const prevMarks = db.marks || {};
+
+    const rows = [];
+    const counters = {INF:0,LON:0,CHT:0,SUM:0,REF:0,DRL:0,SIM:0};
+
+    for(let d=new Date(start); d<exam; d.setDate(d.getDate()+1)){
+      const weekday = d.getDay();
+      const code = weekday===0? 'SIM' : (weekday===6? 'DRL' : ['INF','LON','CHT','SUM','REF'][weekday-1]);
+      counters[code]++;
+      const title = buildTitle(d, code, counters[code]);
+
+      const dates = INTERVALS.map(k=> addFracDaysAsDate(d,k));
+      const due = dates.filter(dd=> dd<=exam);
+
+      rows.push({ id: genId('RD'), base: toInput(d), title, code, due: due.map(x=>toInput(x)) });
+    }
+
+    db.rows = rows;
+    db.start = toInput(start); db.exam = toInput(exam);
+    db.marks = prevMarks; // keep
+    save();
+    render();
+  }
+
+  function buildTitle(date, code, num){
+    const week = weekNumber(fromInput(db.start||toInput(today)), date);
+    const name = {
+      INF:'情報検索・実用文', LON:'論説：主張と根拠', CHT:'図表・データ読解', SUM:'要約・空所補充', REF:'指示語・参照関係', DRL:'弱点ドリル', SIM:'模試/通し（軽）'
+    }[code];
+    const n = (''+num).padStart(2,'0');
+    return `W${week}-${code}${n} ${name}`;
+  }
+  function weekNumber(start, date){ // start-based week (1-index)
+    const ms = startOfDay(date)-startOfDay(start);
+    return Math.floor(ms/ (7*24*3600*1000)) + 1;
+  }
+
+  // ====== render ======
+  function render(){
+    const thead = document.querySelector('#grid thead');
+    const tbody = document.querySelector('#grid tbody');
+    thead.innerHTML=''; tbody.innerHTML='';
+
+    // header
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<th>週/タイトル</th><th>基準日</th>${INTERVALS.map(i=>`<th>${i===0.5?'0.5':i}</th>`).join('')}`;
+    thead.appendChild(tr);
+
+    const start = fromInput(db.start); const exam = fromInput(db.exam);
+
+    // today list
+    const tBox = $('#todayList'); tBox.innerHTML='';
+
+    const rows = (db.rows||[]).filter(r=> r.due.length>0);
+    for(const row of rows){
+      // filter: today only mode => only render rows that have a today due
+      const hasToday = row.due.some(dd=> sameDay(fromInput(dd), today));
+      if(state.todayOnly && !hasToday) continue;
+
+      const trb = document.createElement('tr');
+      trb.innerHTML = `<th>${escapeHtml(row.title)}</th><td>${fmt(fromInput(row.base))}</td>`;
+
+      INTERVALS.forEach((ival, idx)=>{
+        const d = addFracDaysAsDate(fromInput(row.base), ival);
+        if(d>exam){ trb.innerHTML += `<td class="cell past">-</td>`; return; }
+        const key = markKey(row.id, toInput(d), idx);
+        const marked = !!db.marks[key];
+        const isToday = sameDay(d, today);
+        const past = d<today;
+        const cls = ['cell'];
+        if(marked) cls.push('done');
+        if(past && !marked) cls.push('past');
+        if(isToday) cls.push('today');
+        trb.innerHTML += `<td class="${cls.join(' ')}" data-key="${key}" title="${fmt(d)}">${fmt(d)}</td>`;
+
+        // today list card
+        if(isToday){
+          const btn = document.createElement('button');
+          btn.className='btn small';
+          btn.textContent = `${row.title}  #${ival===0.5?'0.5':ival}`;
+          if(marked){ btn.classList.add('ghost'); }
+          btn.addEventListener('click', ()=> toggleMark(key));
+          tBox.appendChild(btn);
+        }
+      });
+      tbody.appendChild(trb);
+    }
+
+    // cell interactivity
+    document.querySelectorAll('.cell').forEach(td=>{
+      const key = td.getAttribute('data-key'); if(!key) return;
+      td.addEventListener('click', ()=> toggleMark(key));
+    });
+  }
+
+  function toggleMark(key){ db.marks[key] = !db.marks[key]; save(); render(); }
+
+  function markKey(id, dateStr, stepIdx){ return `${id}|${dateStr}|${stepIdx}`; }
+
+  // ====== storage & utils ======
+  function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+  function load(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||''); }catch(_){ return null; } }
+  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+  function genId(prefix){ return `${prefix}-${Math.random().toString(36).slice(2,7)}-${Date.now().toString(36).slice(-4)}` }
+})();
+</script></body>
+</html>    .grid.cols-3{grid-template-columns:1fr}
     @media(min-width:800px){.grid.cols-2{grid-template-columns:1fr 1fr}.grid.cols-3{grid-template-columns:2fr 1fr 1fr}}
     label{font-size:12px; color:var(--muted); display:block; margin-bottom:4px}
     input, select, textarea{width:100%; box-sizing:border-box; padding:10px 12px; background:#0f1115; color:var(--ink); border:1px solid var(--line); border-radius:10px; outline:none}
