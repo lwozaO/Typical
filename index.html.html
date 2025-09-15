@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ベトナム語 4択クイズ（JP↔VI）</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #111;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --primary: #111827;
+      --accent: #2563eb;
+      --green: #16a34a;
+      --red: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 920px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.75rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 0.9rem; }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .select, .btn { border: 1px solid var(--border); background: #fff; padding: 8px 12px; border-radius: 10px; font-size: 0.95rem; }
+    .btn { cursor: pointer; }
+    .btn:hover { box-shadow: 0 1px 0 rgba(0,0,0,.05); }
+    .btn.primary { background: #f9fafb; }
+    .btn.on { background: #ecfdf5; border-color: #86efac; }
+
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 12px; }
+    .card.shadow { box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .muted { color: var(--muted); font-size: .85rem; }
+    .big { font-size: 1.5rem; font-weight: 700; }
+
+    details { border: 1px solid var(--border); border-radius: 16px; padding: 12px; background: #fff; }
+    summary { cursor: pointer; color: var(--primary); }
+
+    .qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .qprompt { margin-top: 6px; font-size: 1.6rem; font-weight: 800; word-break: break-word; }
+    .optgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 640px) { .optgrid { grid-template-columns: 1fr 1fr; } }
+    .opt { text-align: left; display: block; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 16px; background: #fff; cursor: pointer; }
+    .opt:hover { box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+    .opt .num { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 999px; font-weight: 600; margin-right: 10px; }
+    .opt.correct { background: #f0fdf4; border-color: #86efac; }
+    .opt.wrong { background: #fef2f2; border-color: #fecaca; }
+
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .spacer { height: 8px; }
+    .chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; }
+    .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    textarea { width: 100%; min-height: 120px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: .9rem; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="row" style="align-items: end; justify-content: space-between;">
+      <div>
+        <h1>ベトナム語 4択クイズ</h1>
+        <div class="sub">日本語↔ベトナム語／音声つき・カテゴリ絞り込み・進捗保存（オフライン可）</div>
+      </div>
+      <div class="toolbar">
+        <select id="direction" class="select">
+          <option>JP→VI</option>
+          <option>VI→JP</option>
+        </select>
+        <button id="audioBtn" class="btn">🔊 音声OFF</button>
+        <button id="exportBtn" class="btn">デッキ書き出し</button>
+        <button id="importBtn" class="btn">デッキ読み込み</button>
+        <input id="fileInput" type="file" accept=".json,.csv,.tsv,.txt" class="hidden" />
+      </div>
+    </header>
+
+    <section class="spacer"></section>
+
+    <section class="grid3">
+      <div class="card">
+        <div class="muted">出題数</div>
+        <div class="big" id="statAsked">0</div>
+      </div>
+      <div class="card">
+        <div class="muted">正答率</div>
+        <div class="big" id="statAcc">0%</div>
+      </div>
+      <div class="card">
+        <div class="muted">連続正解</div>
+        <div class="big" id="statStreak">0</div>
+      </div>
+    </section>
+
+    <section class="spacer"></section>
+
+    <section>
+      <details>
+        <summary>カテゴリ絞り込み</summary>
+        <div id="catArea" class="row" style="margin-top:10px;"></div>
+      </details>
+    </section>
+
+    <section class="spacer"></section>
+
+    <section id="qCard" class="card shadow"></section>
+
+    <section class="spacer"></section>
+
+    <section>
+      <details>
+        <summary>復習・ミスが多い語</summary>
+        <div id="reviewArea" class="row" style="margin-top:10px; flex-direction: column; gap: 8px;"></div>
+      </details>
+    </section>
+
+    <section class="spacer"></section>
+
+    <section>
+      <details>
+        <summary>自分の語彙を追加（1行1語：vi,jp,cat,hint）</summary>
+        <div style="margin-top:10px;">
+          <textarea id="appendText" placeholder="xin chào,こんにちは,greeting\nbao nhiêu?,いくら？,money\nnhà vệ sinh,トイレ,place"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button id="appendBtn" class="btn">追加</button>
+            <div class="muted">CSV/TSV可。例：<code>tôi tên là ~,私の名前は〜です,greeting</code></div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="spacer"></section>
+
+    <footer class="footer">
+      <div class="muted">ショートカット：1〜4で回答／N 次へ／S 発音／I わからない</div>
+      <div class="row">
+        <button id="resetBtn" class="btn">進捗リセット</button>
+        <button id="refreshBtn" class="btn">問題を更新</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+  // =============================
+  // データセット（会話頻出語）
+  // =============================
+  const BASE_DECK = [
+    { vi: "xin chào", jp: "こんにちは", cat: "greeting", hint: "丁寧なあいさつ" },
+    { vi: "chào buổi sáng", jp: "おはよう", cat: "greeting" },
+    { vi: "chào buổi tối", jp: "こんばんは", cat: "greeting" },
+    { vi: "tạm biệt", jp: "さようなら", cat: "greeting" },
+    { vi: "hẹn gặp lại", jp: "また会いましょう", cat: "greeting" },
+    { vi: "cảm ơn", jp: "ありがとう", cat: "greeting" },
+    { vi: "xin lỗi", jp: "ごめんなさい", cat: "greeting" },
+    { vi: "không sao", jp: "大丈夫です", cat: "greeting" },
+    { vi: "vui lòng", jp: "お願いします", cat: "greeting" },
+    { vi: "làm ơn", jp: "お願いします（依頼）", cat: "greeting" },
+    { vi: "rất vui được gặp bạn", jp: "お会いできて嬉しいです", cat: "greeting" },
+    { vi: "tên", jp: "名前", cat: "greeting" },
+    { vi: "tôi tên là ~", jp: "私の名前は〜です", cat: "greeting" },
+    { vi: "bạn tên gì?", jp: "お名前は？", cat: "greeting" },
+    { vi: "đi", jp: "行く", cat: "verb" },
+    { vi: "đến", jp: "来る", cat: "verb" },
+    { vi: "về", jp: "帰る", cat: "verb" },
+    { vi: "ăn", jp: "食べる", cat: "verb" },
+    { vi: "uống", jp: "飲む", cat: "verb" },
+    { vi: "mua", jp: "買う", cat: "verb" },
+    { vi: "bán", jp: "売る", cat: "verb" },
+    { vi: "xem", jp: "見る", cat: "verb" },
+    { vi: "nghe", jp: "聞く", cat: "verb" },
+    { vi: "nói", jp: "話す", cat: "verb" },
+    { vi: "làm", jp: "する／働く", cat: "verb" },
+    { vi: "ngủ", jp: "寝る", cat: "verb" },
+    { vi: "học", jp: "勉強する", cat: "verb" },
+    { vi: "biết", jp: "知っている", cat: "verb" },
+    { vi: "hiểu", jp: "理解する", cat: "verb" },
+    { vi: "cần", jp: "必要だ", cat: "verb" },
+    { vi: "muốn", jp: "欲しい／〜したい", cat: "verb" },
+    { vi: "có", jp: "ある／持つ", cat: "verb" },
+    { vi: "không có", jp: "ない", cat: "verb" },
+    { vi: "thích", jp: "好き", cat: "verb" },
+    { vi: "ghét", jp: "嫌い", cat: "verb" },
+    { vi: "mở", jp: "開ける", cat: "verb" },
+    { vi: "đóng", jp: "閉める", cat: "verb" },
+    { vi: "chờ", jp: "待つ", cat: "verb" },
+    { vi: "giúp", jp: "助ける", cat: "verb" },
+    { vi: "nhà", jp: "家", cat: "place" },
+    { vi: "công ty", jp: "会社", cat: "place" },
+    { vi: "cửa hàng", jp: "店", cat: "place" },
+    { vi: "siêu thị", jp: "スーパー", cat: "place" },
+    { vi: "chợ", jp: "市場", cat: "place" },
+    { vi: "nhà vệ sinh", jp: "トイレ", cat: "place" },
+    { vi: "bệnh viện", jp: "病院", cat: "place" },
+    { vi: "nhà thuốc", jp: "薬局", cat: "place" },
+    { vi: "trường học", jp: "学校", cat: "place" },
+    { vi: "sân bay", jp: "空港", cat: "place" },
+    { vi: "khách sạn", jp: "ホテル", cat: "place" },
+    { vi: "nhà hàng", jp: "レストラン", cat: "place" },
+    { vi: "quán ăn", jp: "食堂／食事処", cat: "place" },
+    { vi: "ga / nhà ga", jp: "駅", cat: "place" },
+    { vi: "bến xe", jp: "バスターミナル", cat: "place" },
+    { vi: "taxi", jp: "タクシー", cat: "travel" },
+    { vi: "xe buýt", jp: "バス", cat: "travel" },
+    { vi: "tàu", jp: "電車／船", cat: "travel" },
+    { vi: "máy bay", jp: "飛行機", cat: "travel" },
+    { vi: "vé", jp: "チケット", cat: "travel" },
+    { vi: "lịch trình", jp: "時刻表／予定", cat: "travel" },
+    { vi: "đi đâu?", jp: "どこへ行きますか？", cat: "travel" },
+    { vi: "đến đâu?", jp: "どこに着きますか？", cat: "travel" },
+    { vi: "bên trái", jp: "左", cat: "direction" },
+    { vi: "bên phải", jp: "右", cat: "direction" },
+    { vi: "thẳng", jp: "まっすぐ", cat: "direction" },
+    { vi: "gần", jp: "近い", cat: "direction" },
+    { vi: "xa", jp: "遠い", cat: "direction" },
+    { vi: "ở đâu?", jp: "どこですか？", cat: "direction" },
+    { vi: "hôm nay", jp: "今日", cat: "time" },
+    { vi: "ngày mai", jp: "明日", cat: "time" },
+    { vi: "hôm qua", jp: "昨日", cat: "time" },
+    { vi: "bây giờ", jp: "今", cat: "time" },
+    { vi: "mấy giờ?", jp: "何時ですか？", cat: "time" },
+    { vi: "giờ", jp: "時", cat: "time" },
+    { vi: "phút", jp: "分", cat: "time" },
+    { vi: "sáng", jp: "朝", cat: "time" },
+    { vi: "trưa", jp: "昼", cat: "time" },
+    { vi: "chiều", jp: "午後", cat: "time" },
+    { vi: "tối", jp: "夜", cat: "time" },
+    { vi: "bao nhiêu?", jp: "いくら？／どれくらい？", cat: "money" },
+    { vi: "đắt", jp: "高い", cat: "money" },
+    { vi: "rẻ", jp: "安い", cat: "money" },
+    { vi: "giảm giá", jp: "割引", cat: "money" },
+    { vi: "hóa đơn", jp: "レシート／請求書", cat: "money" },
+    { vi: "tiền", jp: "お金", cat: "money" },
+    { vi: "thẻ", jp: "カード", cat: "money" },
+    { vi: "tiền mặt", jp: "現金", cat: "money" },
+    { vi: "cơm", jp: "ご飯", cat: "food" },
+    { vi: "phở", jp: "フォー", cat: "food" },
+    { vi: "bánh mì", jp: "バインミー／パン", cat: "food" },
+    { vi: "bún", jp: "ブン（米麺）", cat: "food" },
+    { vi: "cà phê", jp: "コーヒー", cat: "food" },
+    { vi: "trà", jp: "お茶", cat: "food" },
+    { vi: "bia", jp: "ビール", cat: "food" },
+    { vi: "nước", jp: "水", cat: "food" },
+    { vi: "nước mắm", jp: "ヌックマム", cat: "food" },
+    { vi: "sữa", jp: "牛乳", cat: "food" },
+    { vi: "trứng", jp: "卵", cat: "food" },
+    { vi: "rau", jp: "野菜", cat: "food" },
+    { vi: "thịt", jp: "肉", cat: "food" },
+    { vi: "cá", jp: "魚", cat: "food" },
+    { vi: "muối", jp: "塩", cat: "food" },
+    { vi: "đường", jp: "砂糖", cat: "food" },
+    { vi: "gạo", jp: "米", cat: "food" },
+    { vi: "đau", jp: "痛い", cat: "care" },
+    { vi: "mệt", jp: "疲れた", cat: "care" },
+    { vi: "sốt", jp: "熱", cat: "care" },
+    { vi: "bác sĩ", jp: "医者", cat: "care" },
+    { vi: "thuốc", jp: "薬", cat: "care" },
+    { vi: "dị ứng", jp: "アレルギー", cat: "care" },
+    { vi: "có thể ~ không?", jp: "〜できますか？", cat: "ask" },
+    { vi: "giúp tôi với", jp: "手伝ってください", cat: "ask" },
+    { vi: "cho tôi ~", jp: "〜をください", cat: "ask" },
+    { vi: "xin phép", jp: "失礼します／許可を求める", cat: "ask" },
+    { vi: "tại sao?", jp: "なぜ？", cat: "ask" },
+    { vi: "bởi vì ~", jp: "〜だから", cat: "ask" },
+    { vi: "đúng", jp: "正しい", cat: "ask" },
+    { vi: "sai", jp: "間違い", cat: "ask" },
+    { vi: "gia đình", jp: "家族", cat: "people" },
+    { vi: "bạn", jp: "友だち", cat: "people" },
+    { vi: "đồng nghiệp", jp: "同僚", cat: "people" },
+    { vi: "sếp", jp: "上司", cat: "people" },
+    { vi: "nhân viên", jp: "社員／スタッフ", cat: "people" },
+    { vi: "khách", jp: "お客さん", cat: "people" },
+    { vi: "tôi không hiểu", jp: "わかりません", cat: "useful" },
+    { vi: "nói chậm lại", jp: "ゆっくり話してください", cat: "useful" },
+    { vi: "lặp lại được không?", jp: "もう一度言ってもらえますか", cat: "useful" },
+    { vi: "viết ra giúp tôi", jp: "書いてください", cat: "useful" },
+    { vi: "từ này nghĩa là gì?", jp: "この単語はどういう意味？", cat: "useful" },
+    { vi: "bao lâu?", jp: "どれくらいの時間？", cat: "useful" },
+    { vi: "khi nào?", jp: "いつ？", cat: "useful" },
+    { vi: "ở đây", jp: "ここ", cat: "useful" },
+    { vi: "ở kia", jp: "あそこ", cat: "useful" },
+    { vi: "tại đây", jp: "ここで", cat: "useful" },
+    { vi: "một chút", jp: "少し", cat: "useful" },
+    { vi: "rất", jp: "とても", cat: "useful" },
+  ];
+
+  const LS_KEY = "vi-quiz-deck-v1";
+  const LS_SETTINGS = "vi-quiz-settings-v1";
+  const LS_PROGRESS = "vi-quiz-progress-v1";
+
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  function loadLS(key, def) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v ?? def; } catch { return def; }
+  }
+  function saveLS(key, v) {
+    try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
+  }
+  function shuffle(a) { a = a.slice(); for (let i=a.length-1; i>0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function weightedSample(items, weights) { const tot = weights.reduce((s,w)=>s+w,0); let r = Math.random()*tot; for (let i=0;i<items.length;i++){ r-=weights[i]; if(r<=0) return items[i]; } return items[items.length-1]; }
+  function speak(text, lang="vi-VN") { try { const u=new SpeechSynthesisUtterance(text); u.lang=lang; u.rate=1; speechSynthesis.cancel(); speechSynthesis.speak(u);} catch{} }
+
+  // ===== State =====
+  let deck = loadLS(LS_KEY, BASE_DECK);
+  let settings = loadLS(LS_SETTINGS, { direction: "JP→VI", selectedCats: {}, audioOn: true });
+  let progress = loadLS(LS_PROGRESS, { asked: 0, correct: 0, streak: 0, history: [], wrongIds: {} });
+
+  let cats = [];
+  let activeDeck = [];
+  let weights = [];
+
+  let question = null; // {item, options:[str], prompt:str, answerIdx}
+  let choice = null; // 0..3
+  let revealed = false;
+  let qCount = 0;
+
+  function computeCats() {
+    cats = Array.from(new Set(deck.map(d => d.cat || "misc")));
+  }
+  function computeActiveDeck() {
+    const onCats = Object.keys(settings.selectedCats).filter(k => settings.selectedCats[k]);
+    const withId = deck.map((d,i)=>({...d,_id:i}));
+    activeDeck = onCats.length ? withId.filter(d => onCats.includes(d.cat || "misc")) : withId;
+  }
+  function computeWeights() {
+    weights = activeDeck.map(d => 1 + (progress.wrongIds[d._id] || 0));
+  }
+
+  function buildQuestion() {
+    if (activeDeck.length < 4) {
+      $('#qCard').innerHTML = `<div class="muted">問題を準備中…（デッキに4語以上必要）</div>`;
+      return;
+    }
+    const item = weightedSample(activeDeck, weights);
+    const wrongPool = activeDeck.filter(d => d._id !== item._id);
+    const distractors = shuffle(wrongPool).slice(0,3);
+
+    const direction = settings.direction;
+    const toText = (d) => direction === "JP→VI" ? d.vi : d.jp;
+    const promptText = direction === "JP→VI" ? item.jp : item.vi;
+    const opts = shuffle([item, ...distractors]);
+    const answerIdx = opts.findIndex(d => d._id === item._id);
+
+    question = { item, options: opts.map(toText), prompt: promptText, answerIdx };
+    choice = null; revealed = false; qCount++;
+
+    if (settings.audioOn && direction === "JP→VI") {
+      setTimeout(()=>speak(item.vi, 'vi-VN'), 200);
+    }
+    renderQuestion();
+    renderStats();
+  }
+
+  function onAnswer(idx) {
+    if (!question || revealed) return;
+    const isCorrect = idx === question.answerIdx;
+
+    // 成績更新
+    const wrongIds = {...progress.wrongIds};
+    if (isCorrect) {
+      const id = question.item._id; if (wrongIds[id]) wrongIds[id] = Math.max(0, wrongIds[id]-1);
+    } else {
+      const id = question.item._id; wrongIds[id] = (wrongIds[id]||0)+1;
+    }
+    progress = {
+      asked: progress.asked + 1,
+      correct: progress.correct + (isCorrect ? 1 : 0),
+      streak: isCorrect ? progress.streak + 1 : 0,
+      history: [{ q:{vi:question.item.vi, jp:question.item.jp}, correct:isCorrect, choiceIdx: idx, dir: settings.direction, ts: Date.now()}, ...progress.history].slice(0,200),
+      wrongIds,
+    };
+    saveLS(LS_PROGRESS, progress);
+
+    choice = idx; revealed = true;
+
+    if (settings.audioOn && settings.direction === 'VI→JP') {
+      speak(question.item.vi, 'vi-VN');
+    }
+    renderQuestion();
+    renderStats();
+    renderReview();
+  }
+
+  function next() { buildQuestion(); }
+
+  function resetProgress() {
+    progress = { asked:0, correct:0, streak:0, history:[], wrongIds:{} };
+    saveLS(LS_PROGRESS, progress);
+    renderStats(); renderReview();
+  }
+
+  function exportDeck() {
+    const blob = new Blob([JSON.stringify(deck, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download = 'vietnamese_deck.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importDeck(file) {
+    const text = await file.text();
+    try {
+      const data = JSON.parse(text);
+      if (Array.isArray(data)) {
+        const cleaned = data.filter(x=>x&&x.vi&&x.jp).map(x=>({vi:String(x.vi).trim(), jp:String(x.jp).trim(), cat:x.cat||'user', hint:x.hint||''}));
+        if (cleaned.length >= 4) { deck = cleaned; saveLS(LS_KEY, deck); afterDeckChanged(); }
+        return;
+      }
+    } catch{}
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
+    const out = [];
+    for (const line of lines) {
+      const parts = line.includes("\t") ? line.split("\t") : line.split(",");
+      if (parts.length >= 2) out.push({vi:parts[0].trim(), jp:parts[1].trim(), cat:(parts[2]||'user').trim(), hint:(parts[3]||'').trim()});
+    }
+    if (out.length >= 4) { deck = out; saveLS(LS_KEY, deck); afterDeckChanged(); }
+  }
+
+  function appendDeckFromText(text) {
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
+    const out = [];
+    for (const line of lines) {
+      const parts = line.includes("\t") ? line.split("\t") : line.split(",");
+      if (parts.length >= 2) out.push({vi:parts[0].trim(), jp:parts[1].trim(), cat:(parts[2]||'user').trim(), hint:(parts[3]||'').trim()});
+    }
+    if (out.length > 0) {
+      deck = [...out, ...deck]; saveLS(LS_KEY, deck); afterDeckChanged();
+    }
+  }
+
+  function afterDeckChanged() {
+    computeCats(); renderCats();
+    computeActiveDeck(); computeWeights();
+    buildQuestion(); renderReview();
+  }
+
+  // ===== Renderers =====
+  function renderStats() {
+    const acc = progress.asked ? Math.round(progress.correct/progress.asked*100) : 0;
+    $('#statAsked').textContent = String(progress.asked);
+    $('#statAcc').textContent = acc + '%';
+    $('#statStreak').textContent = String(progress.streak);
+  }
+
+  function renderCats() {
+    const area = $('#catArea'); area.innerHTML = '';
+    if (cats.length === 0) { const d=document.createElement('div'); d.className='muted'; d.textContent='（デッキにカテゴリがありません）'; area.appendChild(d); return; }
+    for (const c of cats) {
+      const label = document.createElement('label'); label.className = 'chip';
+      const ck = document.createElement('input'); ck.type='checkbox'; ck.checked = !!settings.selectedCats[c]; ck.addEventListener('change', ()=>{ settings.selectedCats[c]=!settings.selectedCats[c]; saveLS(LS_SETTINGS, settings); computeActiveDeck(); computeWeights(); buildQuestion(); });
+      const span = document.createElement('span'); span.textContent = c;
+      label.appendChild(ck); label.appendChild(span); area.appendChild(label);
+    }
+  }
+
+  function renderQuestion() {
+    const wrap = $('#qCard');
+    if (!question) { wrap.innerHTML = '<div class="muted">問題を準備中…</div>'; return; }
+    const dirLabel = settings.direction === 'JP→VI' ? '日本語 ▶ ベトナム語' : 'ベトナム語 ▶ 日本語';
+    const head = `<div class="qhead"><div><div class="muted">${dirLabel}</div><div class="qprompt">${question.prompt}</div></div><div class="muted">Q${qCount}</div></div>`;
+
+    const opts = question.options.map((opt, idx)=>{
+      let cls = 'opt';
+      if (revealed) cls += idx === question.answerIdx ? ' correct' : (idx === choice ? ' wrong' : '');
+      return `<button class="${cls}" data-idx="${idx}"><span class="num">${idx+1}</span><span>${opt}</span></button>`;
+    }).join('');
+
+    const bottom = revealed
+      ? `<div class="row" style="margin-top:10px;">
+           <div>正解：<span style="font-weight:700;">${settings.direction==='JP→VI'?question.item.vi:question.item.jp}</span></div>
+           ${settings.direction==='JP→VI'?'<button id="speakBtn" class="btn">🔊 発音</button>':''}
+           <button id="nextBtn" class="btn">次へ（N）</button>
+         </div>`
+      : `<div class="row" style="margin-top:10px;"><button id="idkBtn" class="btn">わからない</button></div>`;
+
+    wrap.innerHTML = head + `<div class="optgrid" style="margin-top:10px;">${opts}</div>` + bottom;
+
+    $$('#qCard .opt').forEach(el => el.addEventListener('click', e => onAnswer(Number(el.dataset.idx))));
+    $('#idkBtn') && $('#idkBtn').addEventListener('click', ()=>onAnswer(-1));
+    $('#nextBtn') && $('#nextBtn').addEventListener('click', next);
+    $('#speakBtn') && $('#speakBtn').addEventListener('click', ()=>speak(question.item.vi,'vi-VN'));
+  }
+
+  function renderReview() {
+    const area = $('#reviewArea'); area.innerHTML = '';
+    const pairs = Object.entries(progress.wrongIds).filter(([_,c])=>c>0).sort((a,b)=>b[1]-a[1]).slice(0,20);
+    if (pairs.length === 0) { const d=document.createElement('div'); d.className='muted'; d.textContent='まだミスした問題はありません。'; area.appendChild(d); return; }
+    for (const [id, c] of pairs) {
+      const d = deck[Number(id)]; if (!d) continue;
+      const row = document.createElement('div'); row.className='card'; row.style.display='flex'; row.style.alignItems='center'; row.style.justifyContent='space-between';
+      const left = document.createElement('div'); left.innerHTML = `<div style="font-weight:600;">${d.vi}</div><div class="muted">${d.jp}</div>`;
+      const right = document.createElement('div'); right.className='muted'; right.textContent = `ミス ${c}`;
+      row.appendChild(left); row.appendChild(right); area.appendChild(row);
+    }
+  }
+
+  // ===== Event bindings =====
+  $('#direction').value = settings.direction;
+  $('#direction').addEventListener('change', e=>{ settings.direction = e.target.value; saveLS(LS_SETTINGS, settings); buildQuestion(); });
+
+  const audioBtn = $('#audioBtn');
+  function renderAudioBtn() { audioBtn.textContent = settings.audioOn ? '🔊 音声ON' : '🔇 音声OFF'; audioBtn.className = 'btn' + (settings.audioOn ? ' on' : ''); }
+  renderAudioBtn();
+  audioBtn.addEventListener('click', ()=>{ settings.audioOn = !settings.audioOn; saveLS(LS_SETTINGS, settings); renderAudioBtn(); });
+
+  $('#exportBtn').addEventListener('click', exportDeck);
+  $('#importBtn').addEventListener('click', ()=>$('#fileInput').click());
+  $('#fileInput').addEventListener('change', (e)=>{ const f=e.target.files?.[0]; if (f) importDeck(f); e.target.value=''; });
+
+  $('#appendBtn').addEventListener('click', ()=>{ const t=$('#appendText').value; if (t.trim()) { appendDeckFromText(t); $('#appendText').value=''; }});
+  $('#resetBtn').addEventListener('click', resetProgress);
+  $('#refreshBtn').addEventListener('click', buildQuestion);
+
+  window.addEventListener('keydown', (e)=>{
+    if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if (e.key>='1' && e.key<='4') onAnswer(parseInt(e.key,10)-1);
+    else if (e.key.toLowerCase()==='n') { if (revealed) next(); }
+    else if (e.key.toLowerCase()==='s') { if (question) speak(question.item.vi,'vi-VN'); }
+    else if (e.key.toLowerCase()==='i') { if (!revealed) onAnswer(-1); }
+  });
+
+  // ===== Init =====
+  computeCats(); renderCats();
+  computeActiveDeck(); computeWeights();
+  renderStats(); renderReview();
+  buildQuestion();
+  </script>
+</body>
+</html>
